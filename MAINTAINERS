@@ -1049,7 +1049,6 @@ R:	Gal Pressman <gal.pressman@linux.dev>
 R:	Yossi Leybovich <sleybo@amazon.com>
 L:	linux-rdma@vger.kernel.org
 S:	Supported
-Q:	https://patchwork.kernel.org/project/linux-rdma/list/
 F:	drivers/infiniband/hw/efa/
 F:	include/uapi/rdma/efa-abi.h
 
@@ -5328,8 +5327,8 @@ F:	drivers/iommu/generic_pt/fmt/*bcm2712*
 
 BROADCOM BCM281XX/BCM11XXX/BCM216XX ARM ARCHITECTURE
 M:	Florian Fainelli <florian.fainelli@broadcom.com>
-M:	Ray Jui <rjui@broadcom.com>
-M:	Scott Branden <sbranden@broadcom.com>
+M:	Ray Jui <ray.jui@broadcom.com>
+M:	Scott Branden <scott.branden@broadcom.com>
 R:	Broadcom internal kernel review list <bcm-kernel-feedback-list@broadcom.com>
 S:	Maintained
 T:	git https://github.com/broadcom/mach-bcm
@@ -5626,8 +5625,8 @@ F:	drivers/net/mdio/mdio-bcm-unimac.c
 F:	include/linux/platform_data/mdio-bcm-unimac.h
 
 BROADCOM IPROC ARM ARCHITECTURE
-M:	Ray Jui <rjui@broadcom.com>
-M:	Scott Branden <sbranden@broadcom.com>
+M:	Ray Jui <ray.jui@broadcom.com>
+M:	Scott Branden <scott.branden@broadcom.com>
 R:	Broadcom internal kernel review list <bcm-kernel-feedback-list@broadcom.com>
 L:	linux-arm-kernel@lists.infradead.org (moderated for non-subscribers)
 S:	Maintained
@@ -5664,7 +5663,7 @@ F:	drivers/net/ethernet/broadcom/bgmac*
 F:	drivers/net/ethernet/broadcom/unimac.h
 
 BROADCOM KONA GPIO DRIVER
-M:	Ray Jui <rjui@broadcom.com>
+M:	Ray Jui <ray.jui@broadcom.com>
 R:	Broadcom internal kernel review list <bcm-kernel-feedback-list@broadcom.com>
 S:	Supported
 F:	Documentation/devicetree/bindings/gpio/brcm,kona-gpio.yaml
@@ -8333,7 +8332,7 @@ F:	Documentation/devicetree/bindings/display/panel/panel-edp.yaml
 F:	drivers/gpu/drm/panel/panel-edp.c
 
 DRM DRIVER FOR GENERIC USB DISPLAY
-M:	Ruben Wauters <rubenru09@aol.com>
+M:	Ruben Wauters <ruben.wauters@linux.dev>
 S:	Maintained
 W:	https://github.com/notro/gud/wiki
 T:	git https://gitlab.freedesktop.org/drm/misc/kernel.git
@@ -8889,16 +8888,13 @@ F:	include/drm/drm*.h
 F:	include/linux/vga*
 F:	include/uapi/drm/
 X:	drivers/gpu/drm/amd/
-X:	drivers/gpu/drm/armada/
 X:	drivers/gpu/drm/etnaviv/
 X:	drivers/gpu/drm/exynos/
 X:	drivers/gpu/drm/i915/
-X:	drivers/gpu/drm/kmb/
 X:	drivers/gpu/drm/mediatek/
 X:	drivers/gpu/drm/msm/
 X:	drivers/gpu/drm/nova/
 X:	drivers/gpu/drm/radeon/
-X:	drivers/gpu/drm/tegra/
 X:	drivers/gpu/drm/tyr/
 X:	drivers/gpu/drm/xe/
 
@@ -8949,11 +8945,10 @@ F:	Documentation/devicetree/bindings/display/atmel/
 F:	drivers/gpu/drm/atmel-hlcdc/
 
 DRM DRIVERS FOR BRIDGE CHIPS
-M:	Andrzej Hajda <andrzej.hajda@intel.com>
 M:	Neil Armstrong <neil.armstrong@linaro.org>
+M:	Dmitry Baryshkov <lumag@kernel.org>
 M:	Robert Foss <rfoss@kernel.org>
 R:	Laurent Pinchart <Laurent.pinchart@ideasonboard.com>
-R:	Jonas Karlman <jonas@kwiboo.se>
 R:	Jernej Skrabec <jernej.skrabec@gmail.com>
 R:	Luca Ceresoli <luca.ceresoli@bootlin.com>
 S:	Maintained
@@ -9081,7 +9076,6 @@ M:	Mikko Perttunen <mperttunen@nvidia.com>
 L:	dri-devel@lists.freedesktop.org
 L:	linux-tegra@vger.kernel.org
 S:	Supported
-T:	git https://gitlab.freedesktop.org/drm/tegra.git
 F:	Documentation/devicetree/bindings/display/tegra/nvidia,tegra20-host1x.yaml
 F:	Documentation/devicetree/bindings/gpu/host1x/
 F:	drivers/gpu/drm/tegra/
@@ -9143,6 +9137,8 @@ DRM DRIVERS FOR ROCKCHIP
 M:	Sandy Huang <hjc@rock-chips.com>
 M:	Heiko Stübner <heiko@sntech.de>
 M:	Andy Yan <andyshrk@163.com>
+R:	Chaoyi Chen <chaoyi.chen@rock-chips.com>
+R:	Damon Ding <damon.ding@rock-chips.com>
 L:	dri-devel@lists.freedesktop.org
 L:	linux-rockchip@lists.infradead.org
 S:	Maintained
@@ -9212,7 +9208,6 @@ F:	drivers/gpu/drm/v3d/
 F:	include/uapi/drm/v3d_drm.h
 
 DRM DRIVERS FOR VC4
-M:	Maxime Ripard <mripard@kernel.org>
 M:	Dave Stevenson <dave.stevenson@raspberrypi.com>
 R:	Maíra Canal <mcanal@igalia.com>
 R:	Raspberry Pi Kernel Maintenance <kernel-list@raspberrypi.com>
@@ -11826,6 +11821,7 @@ M:	Dennis Dalessandro <dennis.dalessandro@cornelisnetworks.com>
 L:	linux-rdma@vger.kernel.org
 S:	Supported
 F:	drivers/infiniband/hw/hfi1
+F:	include/uapi/rdma/hfi
 
 HFS FILESYSTEM
 M:	Viacheslav Dubeyko <slava@dubeyko.com>
@@ -12151,6 +12147,7 @@ L:	linux-rdma@vger.kernel.org
 S:	Maintained
 F:	Documentation/devicetree/bindings/infiniband/hisilicon,hns-roce-v1.yaml
 F:	drivers/infiniband/hw/hns/
+F:	include/uapi/rdma/hns-abi.h
 
 HISILICON SAS Controller
 M:	Xingui Yang <yangxingui@huawei.com>
@@ -13117,14 +13114,14 @@ W:	https://www.infineon.com/part/TLV493D-A1B6
 F:	Documentation/devicetree/bindings/iio/magnetometer/infineon,tlv493d-a1b6.yaml
 F:	drivers/iio/magnetometer/tlv493d.c
 
-INFINIBAND SUBSYSTEM
+RDMA (INFINIBAND) SUBSYSTEM
 M:	Jason Gunthorpe <jgg@nvidia.com>
 M:	Leon Romanovsky <leonro@nvidia.com>
 L:	linux-rdma@vger.kernel.org
 S:	Supported
 W:	https://github.com/linux-rdma/rdma-core
 Q:	http://patchwork.kernel.org/project/linux-rdma/list/
-T:	git git://git.kernel.org/pub/scm/linux/kernel/git/rdma/rdma.git
+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/rdma/rdma.git for-next
 F:	Documentation/devicetree/bindings/infiniband/
 F:	Documentation/infiniband/
 F:	drivers/infiniband/
@@ -13419,6 +13416,7 @@ F:	include/linux/net/intel/
 
 INTEL ETHERNET PROTOCOL DRIVER FOR RDMA
 M:	Tatyana Nikolova <tatyana.e.nikolova@intel.com>
+M:	Jacob Moroni <jmoroni@google.com>
 L:	linux-rdma@vger.kernel.org
 S:	Supported
 F:	drivers/infiniband/hw/irdma/
@@ -14208,9 +14206,6 @@ M:	Sagi Grimberg <sagi@grimberg.me>
 M:	Max Gurtovoy <mgurtovoy@nvidia.com>
 L:	linux-rdma@vger.kernel.org
 S:	Supported
-W:	http://www.openfabrics.org
-W:	www.open-iscsi.org
-Q:	http://patchwork.kernel.org/project/linux-rdma/list/
 F:	drivers/infiniband/ulp/iser/
 
 ISCSI EXTENSIONS FOR RDMA (ISER) TARGET
@@ -14218,7 +14213,6 @@ M:	Sagi Grimberg <sagi@grimberg.me>
 L:	linux-rdma@vger.kernel.org
 L:	target-devel@vger.kernel.org
 S:	Supported
-T:	git git://git.kernel.org/pub/scm/linux/kernel/git/nab/target-pending.git master
 F:	drivers/infiniband/ulp/isert
 
 ISL28022 HARDWARE MONITORING DRIVER
@@ -14639,7 +14633,9 @@ R:	Zenghui Yu <yuzenghui@huawei.com>
 L:	linux-arm-kernel@lists.infradead.org (moderated for non-subscribers)
 L:	kvmarm@lists.linux.dev
 S:	Maintained
+P:	Documentation/process/maintainer-kvm-arm64.rst
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git
+F:	Documentation/process/maintainer-kvm-arm64.rst
 F:	Documentation/virt/kvm/arm/
 F:	Documentation/virt/kvm/devices/arm*
 F:	arch/arm64/include/asm/kvm*
@@ -16160,8 +16156,6 @@ F:	drivers/tty/serial/mvebu-uart.c
 MARVELL ARMADA DRM SUPPORT
 M:	Russell King <linux@armlinux.org.uk>
 S:	Maintained
-T:	git git://git.armlinux.org.uk/~rmk/linux-arm.git drm-armada-devel
-T:	git git://git.armlinux.org.uk/~rmk/linux-arm.git drm-armada-fixes
 F:	Documentation/devicetree/bindings/display/armada/
 F:	drivers/gpu/drm/armada/
 F:	include/uapi/drm/armada_drm.h
@@ -17373,7 +17367,6 @@ M:	Yishai Hadas <yishaih@nvidia.com>
 L:	linux-rdma@vger.kernel.org
 S:	Supported
 W:	https://www.nvidia.com/networking/
-Q:	http://patchwork.kernel.org/project/linux-rdma/list/
 F:	drivers/infiniband/hw/mlx4/
 F:	include/linux/mlx4/
 F:	include/uapi/rdma/mlx4-abi.h
@@ -17397,7 +17390,6 @@ M:	Leon Romanovsky <leonro@nvidia.com>
 L:	linux-rdma@vger.kernel.org
 S:	Supported
 W:	https://www.nvidia.com/networking/
-Q:	http://patchwork.kernel.org/project/linux-rdma/list/
 F:	drivers/infiniband/hw/mlx5/
 F:	include/linux/mlx5/
 F:	include/uapi/rdma/mlx5-abi.h
@@ -17505,11 +17497,9 @@ F:	mm/balloon.c
 
 MEMORY MANAGEMENT - CORE
 M:	David Hildenbrand <david@kernel.org>
-R:	Lorenzo Stoakes <ljs@kernel.org>
 R:	Liam R. Howlett <liam@infradead.org>
 R:	Vlastimil Babka <vbabka@kernel.org>
 R:	Mike Rapoport <rppt@kernel.org>
-R:	Suren Baghdasaryan <surenb@google.com>
 R:	Michal Hocko <mhocko@suse.com>
 L:	linux-mm@kvack.org
 S:	Maintained
@@ -17635,10 +17625,10 @@ K:	(?i:vmemmap)
 
 MEMORY MANAGEMENT - MGLRU (MULTI-GEN LRU)
 M:	Andrew Morton <akpm@linux-foundation.org>
-R:	Kairui Song <kasong@tencent.com>
+M:	Kairui Song <kasong@tencent.com>
+R:	Barry Song <baohua@kernel.org>
 R:	Qi Zheng <qi.zheng@linux.dev>
 R:	Shakeel Butt <shakeel.butt@linux.dev>
-R:	Barry Song <baohua@kernel.org>
 R:	Axel Rasmussen <axelrasmussen@google.com>
 R:	Yuanchu Xie <yuanchu@google.com>
 R:	Wei Xu <weixugc@google.com>
@@ -17676,11 +17666,9 @@ F:	mm/migrate_device.c
 MEMORY MANAGEMENT - MISC
 M:	Andrew Morton <akpm@linux-foundation.org>
 M:	David Hildenbrand <david@kernel.org>
-R:	Lorenzo Stoakes <ljs@kernel.org>
 R:	Liam R. Howlett <liam@infradead.org>
 R:	Vlastimil Babka <vbabka@kernel.org>
 R:	Mike Rapoport <rppt@kernel.org>
-R:	Suren Baghdasaryan <surenb@google.com>
 R:	Michal Hocko <mhocko@suse.com>
 L:	linux-mm@kvack.org
 S:	Maintained
@@ -17782,6 +17770,7 @@ F:	include/linux/compaction.h
 F:	include/linux/gfp.h
 F:	include/linux/page-isolation.h
 F:	include/linux/pageblock-flags.h
+F:	include/linux/page_ext.h
 F:	include/trace/events/compaction.h
 F:	include/trace/events/page_isolation.h
 F:	include/trace/events/page_ref.h
@@ -17808,11 +17797,9 @@ F:	tools/mm/page_owner_sort.c
 MEMORY MANAGEMENT - RECLAIM
 M:	Andrew Morton <akpm@linux-foundation.org>
 M:	Johannes Weiner <hannes@cmpxchg.org>
-R:	David Hildenbrand <david@kernel.org>
 R:	Michal Hocko <mhocko@kernel.org>
 R:	Qi Zheng <qi.zheng@linux.dev>
 R:	Shakeel Butt <shakeel.butt@linux.dev>
-R:	Lorenzo Stoakes <ljs@kernel.org>
 L:	linux-mm@kvack.org
 S:	Maintained
 F:	include/trace/events/vmscan.h
@@ -17961,7 +17948,6 @@ F:	tools/testing/selftests/mm/uffd-*.[ch]
 
 MEMORY MANAGEMENT - RUST
 M:	Alice Ryhl <aliceryhl@google.com>
-R:	Lorenzo Stoakes <ljs@kernel.org>
 R:	Liam R. Howlett <liam@infradead.org>
 L:	linux-mm@kvack.org
 L:	rust-for-linux@vger.kernel.org
@@ -17974,30 +17960,37 @@ F:	rust/kernel/mm.rs
 F:	rust/kernel/mm/
 F:	rust/kernel/page.rs
 
-MEMORY MAPPING
-M:	Andrew Morton <akpm@linux-foundation.org>
-M:	Liam R. Howlett <liam@infradead.org>
+MEMORY MANAGEMENT - VMA
 M:	Lorenzo Stoakes <ljs@kernel.org>
+M:	Liam R. Howlett <liam@infradead.org>
+M:	Suren Baghdasaryan <surenb@google.com>
 R:	Vlastimil Babka <vbabka@kernel.org>
-R:	Jann Horn <jannh@google.com>
+R:	Shakeel Butt <shakeel.butt@linux.dev>
 R:	Pedro Falcato <pfalcato@suse.de>
+R:	David Hildenbrand <david@kernel.org>
+R:	Jann Horn <jannh@google.com>
 L:	linux-mm@kvack.org
 S:	Maintained
-W:	http://www.linux-mm.org
-T:	git git://git.kernel.org/pub/scm/linux/kernel/git/akpm/mm
+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/mm/vma.git for-next
 F:	Documentation/core-api/protection-keys.rst
 F:	Documentation/filesystems/mmap_prepare.rst
+F:	Documentation/mm/process_addrs.rst
 F:	Documentation/userspace-api/mseal.rst
 F:	fs/proc/task_mmu.c
 F:	fs/proc/task_nommu.c
 F:	include/linux/mman.h
+F:	include/linux/mmap_lock.h
 F:	include/linux/pkeys.h
 F:	include/trace/events/mmap.h
+F:	include/trace/events/mmap_lock.h
+F:	include/uapi/asm-generic/mman-common.h
 F:	include/uapi/linux/mman.h
 F:	mm/char-mem.c
+F:	mm/madvise.c
 F:	mm/mincore.c
 F:	mm/mlock.c
 F:	mm/mmap.c
+F:	mm/mmap_lock.c
 F:	mm/mprotect.c
 F:	mm/mremap.c
 F:	mm/mseal.c
@@ -18010,36 +18003,6 @@ F:	mm/vma_init.c
 F:	mm/vma_internal.h
 F:	tools/testing/selftests/mm/merge.c
 F:	tools/testing/vma/
-
-MEMORY MAPPING - LOCKING
-M:	Andrew Morton <akpm@linux-foundation.org>
-M:	Suren Baghdasaryan <surenb@google.com>
-M:	Liam R. Howlett <liam@infradead.org>
-M:	Lorenzo Stoakes <ljs@kernel.org>
-R:	Vlastimil Babka <vbabka@kernel.org>
-R:	Shakeel Butt <shakeel.butt@linux.dev>
-L:	linux-mm@kvack.org
-S:	Maintained
-W:	http://www.linux-mm.org
-T:	git git://git.kernel.org/pub/scm/linux/kernel/git/akpm/mm
-F:	Documentation/mm/process_addrs.rst
-F:	include/linux/mmap_lock.h
-F:	include/trace/events/mmap_lock.h
-F:	mm/mmap_lock.c
-
-MEMORY MAPPING - MADVISE (MEMORY ADVICE)
-M:	Andrew Morton <akpm@linux-foundation.org>
-M:	Liam R. Howlett <liam@infradead.org>
-M:	Lorenzo Stoakes <ljs@kernel.org>
-M:	David Hildenbrand <david@kernel.org>
-R:	Vlastimil Babka <vbabka@kernel.org>
-R:	Jann Horn <jannh@google.com>
-L:	linux-mm@kvack.org
-S:	Maintained
-W:	http://www.linux-mm.org
-T:	git git://git.kernel.org/pub/scm/linux/kernel/git/akpm/mm
-F:	include/uapi/asm-generic/mman-common.h
-F:	mm/madvise.c
 
 MEMORY TECHNOLOGY DEVICES (MTD)
 M:	Miquel Raynal <miquel.raynal@bootlin.com>
@@ -20482,7 +20445,7 @@ F:	drivers/net/dsa/ocelot/ocelot_ext.c
 F:	include/linux/mfd/ocelot.h
 
 OCXL (Open Coherent Accelerator Processor Interface OpenCAPI) DRIVER
-M:	Mahesh J Salgaonkar <mahesh@linux.ibm.com>
+M:	Madhavan Srinivasan <maddy@linux.ibm.com>
 R:	Andrew Donnellan <andrew+kernel@donnellan.id.au>
 L:	linuxppc-dev@lists.ozlabs.org
 S:	Odd Fixes
@@ -21625,7 +21588,7 @@ F:	drivers/pci/endpoint/
 F:	tools/testing/selftests/pci_endpoint/
 
 PCI ENHANCED ERROR HANDLING (EEH) FOR POWERPC
-M:	Mahesh J Salgaonkar <mahesh@linux.ibm.com>
+M:	Sourabh Jain <sourabhjain@linux.ibm.com>
 R:	Oliver O'Halloran <oohall@gmail.com>
 L:	linuxppc-dev@lists.ozlabs.org
 S:	Supported
@@ -21773,7 +21736,7 @@ S:	Odd Fixes
 F:	drivers/pci/controller/pci-thunder-*
 
 PCIE DRIVER FOR ESWIN
-M:	Senchuan Zhang <zhangsenchuan@eswincomputing.com>
+M:	Donghui Zhao <zhaodonghui@eswincomputing.com>
 L:	linux-pci@vger.kernel.org
 S:	Maintained
 F:	Documentation/devicetree/bindings/pci/eswin,pcie.yaml
@@ -23546,6 +23509,7 @@ M:	Dennis Dalessandro <dennis.dalessandro@cornelisnetworks.com>
 L:	linux-rdma@vger.kernel.org
 S:	Supported
 F:	drivers/infiniband/sw/rdmavt
+F:	include/uapi/rdma/rvt-abi.h
 
 RDS - RELIABLE DATAGRAM SOCKETS
 M:	Allison Henderson <achender@kernel.org>
@@ -24667,7 +24631,6 @@ K:	\b(?i:rust)\b
 RUST [ALLOC]
 M:	Danilo Krummrich <dakr@kernel.org>
 M:	Alice Ryhl <aliceryhl@google.com>
-R:	Lorenzo Stoakes <ljs@kernel.org>
 R:	Vlastimil Babka <vbabka@kernel.org>
 R:	Liam R. Howlett <liam@infradead.org>
 R:	Uladzislau Rezki <urezki@gmail.com>
@@ -25269,7 +25232,6 @@ SCSI RDMA PROTOCOL (SRP) INITIATOR
 M:	Bart Van Assche <bvanassche@acm.org>
 L:	linux-rdma@vger.kernel.org
 S:	Supported
-Q:	http://patchwork.kernel.org/project/linux-rdma/list/
 F:	drivers/infiniband/ulp/srp/
 F:	include/scsi/srp.h
 
@@ -25278,7 +25240,6 @@ M:	Bart Van Assche <bvanassche@acm.org>
 L:	linux-rdma@vger.kernel.org
 L:	target-devel@vger.kernel.org
 S:	Supported
-Q:	http://patchwork.kernel.org/project/linux-rdma/list/
 F:	drivers/infiniband/ulp/srpt/
 
 SCSI SG DRIVER
@@ -29865,6 +29826,7 @@ F:	fs/vboxsf/*
 
 VIRTUAL PCM TEST DRIVER
 M:	Ivan Orlov <ivan.orlov0322@gmail.com>
+R:	HyeongJun An <sammiee5311@gmail.com>
 L:	linux-sound@vger.kernel.org
 S:	Maintained
 F:	Documentation/sound/cards/pcmtest.rst
@@ -29983,10 +29945,10 @@ F:	arch/x86/kernel/cpu/vmware.c
 VMWARE PVRDMA DRIVER
 M:	Bryan Tan <bryan-bt.tan@broadcom.com>
 M:	Vishnu Dasa <vishnu.dasa@broadcom.com>
-R:	Broadcom internal kernel review list <bcm-kernel-feedback-list@broadcom.com>
 L:	linux-rdma@vger.kernel.org
 S:	Supported
 F:	drivers/infiniband/hw/vmw_pvrdma/
+F:	include/uapi/rdma/vmw_pvrdma-abi.h
 
 VMWARE PVSCSI DRIVER
 M:	Vishal Bhakta <vishal.bhakta@broadcom.com>
