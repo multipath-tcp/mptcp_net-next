@@ -587,6 +587,7 @@ static void subflow_finish_connect(struct sock *sk, const struct sk_buff *skb)
 
 	msk = mptcp_sk(parent);
 	subflow->rel_write_seq = 1;
+	subflow->opt_ack_seq = tcp_sk(sk)->snd_una;
 	subflow->conn_finished = 1;
 	subflow->ssn_offset = TCP_SKB_CB(skb)->seq;
 	pr_debug("subflow=%p synack seq=%x\n", subflow, subflow->ssn_offset);
@@ -2162,6 +2163,7 @@ static void subflow_ulp_clone(const struct request_sock *req,
 	new_ctx->tcp_state_change = old_ctx->tcp_state_change;
 	new_ctx->tcp_error_report = old_ctx->tcp_error_report;
 	new_ctx->rel_write_seq = 1;
+	new_ctx->opt_ack_seq = tcp_rsk(req)->snt_isn + 1;
 
 	if (subflow_req->mp_capable) {
 		/* see comments in subflow_syn_recv_sock(), MPTCP connection

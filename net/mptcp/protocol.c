@@ -1042,6 +1042,9 @@ static void mptcp_subflow_joined(struct mptcp_sock *msk, struct sock *ssk)
 {
 	mptcp_subflow_ctx(ssk)->map_seq = READ_ONCE(msk->ack_seq);
 	msk->allow_infinite_fallback = false;
+	/* an active join is added once fully established, see options.c */
+	if (!mptcp_subflow_ctx(ssk)->request_join)
+		set_bit(MPTCP_JOINED, &msk->flags);
 	mptcp_event(MPTCP_EVENT_SUB_ESTABLISHED, msk, ssk, GFP_ATOMIC);
 }
 
@@ -1509,10 +1512,12 @@ alloc_skb:
 		copy = 1;
 	}
 
-	/* old data acked without MPTCP opts: the peer may have fallen back */
+	/* data acked without MPTCP opts: the peer may have fallen back, only
+	 * possible before a join, see RFC 8684
+	 */
 	if (unlikely(before64(data_seq, msk->snd_nxt) &&
-		     subflow->old_data_pending &&
-		     !before(tcp_sk(ssk)->snd_una, subflow->old_data_end))) {
+		     !test_bit(MPTCP_JOINED, &msk->flags) &&
+		     after(tcp_sk(ssk)->snd_una, subflow->opt_ack_seq))) {
 		tcp_remove_empty_skb(ssk);
 		MPTCP_INC_STATS(sock_net(ssk), MPTCP_MIB_FALLBACKFAILED);
 		subflow->reset_transient = 0;
