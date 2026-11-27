@@ -7,8 +7,8 @@ Intro
 =====
 
 The MSG_ZEROCOPY flag enables copy avoidance for socket send calls.
-The feature is currently implemented for TCP, UDP and VSOCK (with
-virtio transport) sockets.
+The feature is currently implemented for TCP, MPTCP, UDP and VSOCK
+(with virtio transport) sockets.
 
 
 Opportunity and Caveats
@@ -175,7 +175,7 @@ read_notification() call in the previous snippet. A notification
 is encoded in the standard error format, sock_extended_err.
 
 The level and type fields in the control data are protocol family
-specific, IP_RECVERR or IPV6_RECVERR (for TCP or UDP socket).
+specific, IP_RECVERR or IPV6_RECVERR (for TCP, MPTCP or UDP socket).
 For VSOCK socket, cmsg_level will be SOL_VSOCK and cmsg_type will be
 VSOCK_RECVERR.
 
@@ -238,7 +238,7 @@ Implementation
 Loopback
 --------
 
-For TCP and UDP:
+For TCP, MPTCP and UDP:
 Data sent to local sockets can be queued indefinitely if the receive
 process does not read its socket. Unbound notification latency is not
 acceptable. For this reason all packets generated with MSG_ZEROCOPY
