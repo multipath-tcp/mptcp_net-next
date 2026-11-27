@@ -1,2 +1,30 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/selftests-mptcp-join-check-re-adding-signal-subflow-ID-0-endp
+Subject: [PATCH] selftests: mptcp: join: check re-adding signal+subflow ID 0 endp
+
+This test extends "delete and re-add" to validate the previous commit:
+when the endpoint linked to the initial subflow (ID 0) had both the
+signal and subflow flags, it was counted as used each time it was
+re-added, while this counter is not decremented for this special
+endpoint. Once the counter reached the number of subflow endpoints, no
+more subflows were created.
+
+From the second round, this endpoint is now re-added with the signal
+flag too: without the previous commit, the subflow is not re-created at
+the third round.
+
+The ADD_ADDR sent at these two rounds are dropped, and not
+retransmitted: if the server received them before the new subflow, it
+would try to connect back to the address and port of the client, and
+fail, which would change the counters. If they cannot be dropped, e.g.
+with an older version of nft, the signal flag is not added, and the
+subtest is marked as skipped.
+
+The 'Fixes' tag here below is the same as the one from the previous
+commit: this patch here is not fixing anything wrong in the selftests,
+but it validates the previous fix for an issue introduced by this commit
+ID.
+
+Fixes: 9366922adc6a ("mptcp: pm: fix ID 0 endp usage after multiple re-creations")
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+---
+v2: skip the signal part if the nft rule cannot be added (Clashiko)
