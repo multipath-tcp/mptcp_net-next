@@ -192,11 +192,15 @@ jobs:
           key: ${{ steps.restore-ccache.outputs.cache-primary-key }}
 
   perf:
-    name: "Perf"
+    name: "Perf (${{ matrix.part }}/${{ strategy.job-total }})"
     if: "! startswith(github.ref, 'refs/tags/patchew/') || contains(github.event.head_commit.message, 'Message-Id: ')"
     runs-on: ubuntu-latest
     permissions:
       contents: read # to fetch code (actions/checkout)
+    strategy:
+      fail-fast: false
+      matrix:
+        part: [1, 2, 3, 4] # same number as PERF_PARTS in perf-merge
 
     steps:
       - name: "Checkout"
@@ -258,14 +262,15 @@ jobs:
             -v "${PWD}:${PWD}" \
             ghcr.io/multipath-tcp/mptcp-upstream-virtme-docker:latest \
               perf-normal --build --json perf.json --json-only-fails -C /perf \
-                          --info "run_id:${GITHUB_RUN_ID}"
+                          --info "run_id:${GITHUB_RUN_ID}" \
+                          --parallel "${{ matrix.part }}/${{ strategy.job-total }}"
 
       - name: "Publish conclusion"
         if: always()
         run: |
           set +e
           {
-            echo '## Perf'
+            echo '## Perf (${{ matrix.part }}/${{ strategy.job-total }})'
             echo 'Branch: ${{ github.ref_name }}'
             echo '### Conclusion'
             cat ".virtme/perf_logs/conclusion.txt" || echo "No conclusion"
@@ -298,7 +303,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: perf
+          name: perf-part-${{ matrix.part }}
           compression-level: 9
           include-hidden-files: true # .virtme
           path: |
@@ -308,7 +313,118 @@ jobs:
       - name: "Prepare perf results artifacts"
         if: always() && (github.repository_owner != 'multipath-tcp' || github.ref_name == 'export' || github.ref_name == 'export-net')
         run: |
-          tar -cvJf perf-results.tar.xz results/perf_reg/${{ steps.branch.outputs.name }}
+          # only the new results: the other parts have the ones of their tests
+          git -C results ls-files -z --modified --others -- "perf_reg/${{ steps.branch.outputs.name }}" |
+            sed -z 's,^,results/,' |
+            tar --null -T - -cvJf "perf-results-${{ matrix.part }}.tar.xz"
+
+      - name: "Artifacts (Results)"
+        if: always() && (github.repository_owner != 'multipath-tcp' || github.ref_name == 'export' || github.ref_name == 'export-net')
+        uses: actions/upload-artifact@v7
+        with:
+          archive: false
+          path: |
+            perf-results-${{ matrix.part }}.tar.xz
+
+      - name: "Artifacts (failure)"
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: perf-debug-info-${{ matrix.part }}
+          compression-level: 9
+          path: |
+            vmlinux.zstd
+            kmemleak.txt
+
+  perf-merge:
+    name: "Perf"
+    needs: perf
+    if: "always() && (! startswith(github.ref, 'refs/tags/patchew/') || contains(github.event.head_commit.message, 'Message-Id: '))"
+    runs-on: ubuntu-latest
+    env:
+      PERF_PARTS: 4 # number of parts in the matrix of the perf job
+
+    steps:
+      - name: "Get results"
+        uses: actions/download-artifact@v8
+        with:
+          pattern: perf-part-*
+          merge-multiple: false
+
+      - name: "Merge results"
+        run: |
+          mkdir -p .virtme/perf_logs
+          ccls=() jsons=() missing=()
+          for part in $(seq "${PERF_PARTS}"); do
+            dir="perf-part-${part}"
+            ccl="$(cut -d: -f3- "${dir}/.virtme/perf_logs/conclusion.txt" | sed 's/^ //' || true)"
+            ccls+=("${ccl:-"Critical: No conclusion ❓"}")
+            if [ -s "${dir}/perf.json" ]; then
+              jsons+=("${dir}/perf.json")
+            else
+              missing+=("${part}/${PERF_PARTS}")
+            fi
+            {
+              echo "== Part ${part}/${PERF_PARTS} =="
+              cat "${dir}/.virtme/perf_logs/summary.txt" || echo "No summary"
+              echo
+            } >> .virtme/perf_logs/summary.txt
+          done
+
+          # the worst first: it gives the status, e.g. for Patchwork
+          ccl="$(printf '%s\n' "${ccls[@]}" | sort -u |
+                 awk '{ print (/^Success/ ? 2 : /^Unstable/ ? 1 : 0) "\t" $0 }' |
+                 sort -s -n -k1,1 | cut -f2- | paste -s -d '|' | sed 's/|/ | /g')"
+          echo "KVM Validation: normal: ${ccl}" > .virtme/perf_logs/conclusion.txt
+          cat .virtme/perf_logs/conclusion.txt
+
+          # each part has different tests: their outliers are concatenated
+          if [ "${#jsons[@]}" -gt 0 ]; then
+            jq -s --arg missing "${missing[*]}" '
+              (map(.outliers // empty) | join("\n")) as $o
+              | reduce .[] as $p ({}; . * $p)
+              | if $o == "" then del(.outliers) else .outliers = $o end
+              | if $missing == "" then . else .error = "no results: part(s) \($missing)" end
+            ' "${jsons[@]}" > perf.json
+          fi
+
+      - name: "Publish conclusion"
+        if: always()
+        run: |
+          {
+            echo '## Perf'
+            echo 'Branch: ${{ github.ref_name }}'
+            echo '### Conclusion'
+            cat ".virtme/perf_logs/conclusion.txt" || echo "No conclusion"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: "Artifacts"
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: perf
+          compression-level: 9
+          include-hidden-files: true # .virtme
+          path: |
+            perf.json
+            .virtme/perf_logs/
+
+      - name: "Get perf results artifacts"
+        if: always() && (github.repository_owner != 'multipath-tcp' || github.ref_name == 'export' || github.ref_name == 'export-net')
+        uses: actions/download-artifact@v8
+        with:
+          pattern: perf-results-*.tar.xz
+          merge-multiple: true
+
+      - name: "Prepare perf results artifacts"
+        if: always() && (github.repository_owner != 'multipath-tcp' || github.ref_name == 'export' || github.ref_name == 'export-net')
+        run: |
+          # each part only has the new results of its tests
+          mkdir -p merged/results
+          for f in perf-results-*.tar.xz; do
+            tar -C merged -xvJf "${f}"
+          done
+          tar -C merged -cvJf perf-results.tar.xz results
 
       - name: "Artifacts (Results)"
         if: always() && (github.repository_owner != 'multipath-tcp' || github.ref_name == 'export' || github.ref_name == 'export-net')
@@ -317,16 +433,6 @@ jobs:
           archive: false
           path: |
             perf-results.tar.xz
-
-      - name: "Artifacts (failure)"
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: perf-debug-info
-          compression-level: 9
-          path: |
-            vmlinux.zstd
-            kmemleak.txt
 
   publish-test-results:
     name: "Publish Tests Results"
@@ -360,7 +466,7 @@ jobs:
 
   notif:
     name: "Notifications"
-    needs: [tests, perf]
+    needs: [tests, perf, perf-merge]
     # only for the official repo (patchew and export)
     if: always() && github.repository_owner == 'multipath-tcp' && (needs.tests.result == 'success' || needs.tests.result == 'failure')
     concurrency:
@@ -756,7 +862,7 @@ jobs:
 
   status:
     name: "Status"
-    needs: [tests, perf]
+    needs: [tests, perf, perf-merge]
     # only for the non official repos
     if: always() && github.repository_owner != 'multipath-tcp'
     runs-on: ubuntu-latest
