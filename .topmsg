@@ -1,2 +1,26 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-don-t-inherit-fastopening-from-a-listener
+Subject: [PATCH] mptcp: don't inherit fastopening from a listener
+
+A new msk is a copy of its listener, made without the listener's lock:
+if the application calls sendmsg() with MSG_FASTOPEN on the listener at
+the same time, the new msk can inherit msk->fastopening, only set during
+tcp_sendmsg_fastopen(). mptcp_disconnect() then fails on this socket:
+connect(AF_UNSPEC) returns EBUSY.
+
+Clear this flag when creating a new msk.
+
+This issue has been found by an AI code review agent, while reviewing
+"mptcp: fastopen: keep listeners and connections": before this other
+fix, these new sockets were mostly reset with the listener. It has been
+confirmed with a Packetdrill test, and a debug delay added in
+mptcp_sendmsg_fastopen(), during which the handshake completes. Without
+this patch, connect(AF_UNSPEC) on the accepted socket failed:
+
+  runtime error in connect call: Expected result 0 but got -1 with errno 16 (Device or resource busy)
+
+Fixes: 7d803344fdc3 ("mptcp: fix deadlock in fastopen error path")
+Reviewed-by: Geliang Tang <geliang@kernel.org>
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+---
+v2: new, for an issue found by a review agent
+v3: msg: the new title of the previous patch
