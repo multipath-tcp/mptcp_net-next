@@ -347,6 +347,7 @@ struct net_bridge_fdb_flush_desc {
 #define BR_SGRP_F_SEND		BIT(1)
 #define BR_SGRP_F_INSTALLED	BIT(2)
 #define BR_SGRP_F_USER_ADDED	BIT(3)
+#define BR_SGRP_F_NEW		BIT(4)
 
 struct net_bridge_mcast_gc {
 	struct hlist_node		gc_node;
