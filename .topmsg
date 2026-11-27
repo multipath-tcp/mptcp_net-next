@@ -1,2 +1,39 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-keep-an-orphan-while-it-can-send-its-data
+Subject: [PATCH] mptcp: keep an orphan while it can send its data
+
+The close timeout of an orphaned MPTCP socket started at close(), and
+its expiry reset the connection, while some data could still be waiting
+for the peer to open its window: a peer reading slowly or pausing got a
+reset 60 seconds after close(), and lost the end of the data, while TCP
+delivers it.
+
+This timeout is there for the DATA_FIN exchange, see commit d866ae9aaa43
+("mptcp: add a new sysctl for make after break timeout"), and for an
+orphan that can no longer send anything. So restart it when the DATA_FIN
+is sent, and when it expires before, as long as a subflow can still send
+the data, which is then pushed again: an established subflow, on which
+the peer acked something recently, at least the window probes. Until
+then, as for a TCP socket that is not orphaned, nothing limits how long
+the peer can keep its window closed, while it acks the window probes.
+The timeout still starts at close(): the subflows are not TCP orphans,
+so its expiry is the only check that the orphan can still send.
+
+This was reported on GitHub, with a reproducer: a server writes 2 MB,
+then calls close(), while the client pauses before reading the rest.
+After a pause of 90 seconds, the client got ECONNRESET, while TCP
+delivered everything, as MPTCP now does. If the client vanishes instead,
+the orphan is now reset as TCP does.
+
+Fixes: e16163b6e2b7 ("mptcp: refactor shutdown and close")
+Closes: https://github.com/multipath-tcp/mptcp_net-next/issues/647
+Reviewed-by: Mat Martineau <martineau@kernel.org>
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+---
+v2: new, for issue #647 reported on GitHub
+
+Note (Clashiko on v2 and v3): when the last subflow is closed in the
+same worker run, before the DATA_FIN is sent, the destruction of the
+orphan is delayed once, by the close timeout: rare and bounded, not
+worth checking the subflows before restarting the timeout. Not
+restarting it once expired would reset an orphan sending its DATA_FIN
+after a long probing.
