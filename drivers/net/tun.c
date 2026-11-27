@@ -1887,11 +1887,8 @@ static ssize_t tun_get_user(struct tun_struct *tun, struct tun_file *tfile,
 			goto drop;
 		if (!skb) {
 			/* consumed by XDP, after copying */
-			if (msg_control) {
-				struct ubuf_info *uarg = msg_control;
-
-				uarg->ops->complete(NULL, uarg, false);
-			}
+			if (msg_control)
+				net_zcopy_complete(NULL, msg_control, false);
 			return total_len;
 		}
 	} else {
