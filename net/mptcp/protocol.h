@@ -117,6 +117,8 @@
 #define MPTCP_FALLBACK_DONE	2
 #define MPTCP_WORK_CLOSE_SUBFLOW 3
 #define MPTCP_RTX_ENABLED	4
+#define MPTCP_ORPHAN_COUNTED	5
+#define MPTCP_JOINED		6
 
 /* MPTCP socket release cb flags */
 #define MPTCP_PUSH_PENDING	1
@@ -391,7 +393,6 @@ struct mptcp_sock {
 
 	struct list_head backlog_list;	/* protected by the data lock */
 	u32		backlog_len;
-	u32		backlog_unaccounted;
 };
 
 #define mptcp_data_lock(sk) spin_lock_bh(&(sk)->sk_lock.slock)
@@ -553,8 +554,10 @@ DECLARE_PER_CPU(struct mptcp_delegated_action, mptcp_delegated_actions);
 #define MPTCP_DELEGATE_SEND		1
 #define MPTCP_DELEGATE_ACK		2
 #define MPTCP_DELEGATE_SNDBUF		3
+#define MPTCP_DELEGATE_DEAD		4
 
-#define MPTCP_DELEGATE_ACTIONS_MASK	(~BIT(MPTCP_DELEGATE_SCHEDULED))
+#define MPTCP_DELEGATE_ACTIONS_MASK	(~(BIT(MPTCP_DELEGATE_SCHEDULED) | \
+					   BIT(MPTCP_DELEGATE_DEAD)))
 /* MPTCP subflow context */
 struct mptcp_subflow_context {
 	struct	list_head node;/* conn_list of subflows */
@@ -576,6 +579,8 @@ struct mptcp_subflow_context {
 	__wsum	map_data_csum;
 	u32	map_csum_len;
 	u32	prev_rtt_seq;
+	u32	dsn_base;	    /* MPC: DSN - SSN + 1 of peer's last map */
+	u32	dsn_end;	    /* MPC: highest end of the peer's maps */
 	u32	request_mptcp : 1,  /* send MP_CAPABLE */
 		request_join : 1,   /* send MP_JOIN */
 		request_bkup : 1,
@@ -599,7 +604,9 @@ struct mptcp_subflow_context {
 		is_mptfo : 1,	    /* subflow is doing TFO */
 		mpc_drop : 1,	    /* the MPC option has been dropped in a rtx */
 		resetting : 1,	    /* subflow is resetting */
-		__unused : 9;
+		old_data_pending : 1, /* old data not acked with MPTCP opts */
+		map_old : 1,	    /* MPC: peer's last map is below dsn_end */
+		__unused : 7;
 	bool	data_avail;
 	bool	scheduled;
 	bool	pm_listener;	    /* a listener managed by the kernel PM? */
@@ -627,12 +634,13 @@ struct mptcp_subflow_context {
 				     */
 
 	u32	subflow_id;
+	u32	old_data_end;	    /* TCP write_seq after the last old data */
 
-	long	delegated_status;
 	unsigned long	fail_tout;
 
 	);
 
+	long	delegated_status;
 	struct	list_head delegated_node;   /* link into delegated_action, protected by local BH */
 
 	u32	setsockopt_seq;
@@ -640,6 +648,7 @@ struct mptcp_subflow_context {
 	int     cached_sndbuf;	    /* sndbuf size when last synced with the msk sndbuf,
 				     * protected by the msk socket lock
 				     */
+	u32	opt_ack_seq;	    /* highest TCP ack_seq with MPTCP opts */
 
 	struct	sock *tcp_sock;	    /* tcp sk backpointer */
 	struct	sock *conn;	    /* parent mptcp_sock */
@@ -671,6 +680,8 @@ mptcp_subflow_ctx_reset(struct mptcp_subflow_context *subflow)
 	memset(&subflow->reset, 0, sizeof(subflow->reset));
 	subflow->request_mptcp = 1;
 	WRITE_ONCE(subflow->local_id, -1);
+	set_mask_bits(&subflow->delegated_status,
+		      MPTCP_DELEGATE_ACTIONS_MASK, 0);
 }
 
 /* Convert reset reasons in MPTCP to enum sk_rst_reason type */
@@ -806,6 +817,16 @@ mptcp_subflow_delegated_next(struct mptcp_delegated_action *delegated)
 	list_del_init(&ret->delegated_node);
 	local_unlock_nested_bh(&mptcp_delegated_actions.bh_lock);
 	return ret;
+}
+
+static inline void mptcp_subflow_free_ctx(struct mptcp_subflow_context *subflow)
+{
+	long old = set_mask_bits(&subflow->delegated_status, 0,
+				 BIT(MPTCP_DELEGATE_DEAD));
+
+	/* a scheduled subflow is owned by mptcp_napi_poll(), which will free it */
+	if (!(old & BIT(MPTCP_DELEGATE_SCHEDULED)))
+		kfree_rcu(subflow, rcu);
 }
 
 void __mptcp_inherit_memcg(struct sock *sk, struct sock *ssk, gfp_t gfp);
@@ -1229,7 +1250,8 @@ bool mptcp_pm_add_addr_signal(struct mptcp_sock *msk, int *size, int remaining,
 			      struct mptcp_addr_info *addr, bool *echo,
 			      bool *drop_ts);
 bool mptcp_pm_rm_addr_signal(struct mptcp_sock *msk, unsigned int remaining,
-			     struct mptcp_rm_list *rm_list, int *len);
+			     struct mptcp_rm_list *rm_list, int *len,
+			     bool size_only);
 int mptcp_pm_get_local_id(struct mptcp_sock *msk, struct sock_common *skc);
 int mptcp_pm_nl_get_local_id(struct mptcp_sock *msk,
 			     struct mptcp_pm_addr_entry *skc);
@@ -1331,6 +1353,15 @@ static inline bool mptcp_try_fallback(struct sock *ssk, int fb_mib)
 	struct mptcp_sock *msk;
 
 	msk = mptcp_sk(sk);
+
+	/* the peer might still be resending old data */
+	if (subflow->map_old && !__mptcp_check_fallback(msk))
+		return false;
+
+	/* queued old data would be sent without mapping after a fallback */
+	if (subflow->old_data_pending && !__mptcp_check_fallback(msk))
+		return false;
+
 	if (!__mptcp_try_fallback(msk, fb_mib))
 		return false;
 

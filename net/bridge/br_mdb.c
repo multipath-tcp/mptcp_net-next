@@ -867,6 +867,7 @@ static int br_mdb_add_group_src(const struct br_mdb_config *cfg,
 			NL_SET_ERR_MSG_MOD(extack, "Failed to add new source entry");
 			return -ENOSPC;
 		}
+		ent->flags |= BR_SGRP_F_NEW;
 	} else if (!(cfg->nlflags & NLM_F_REPLACE)) {
 		NL_SET_ERR_MSG_MOD(extack, "Source entry already exists");
 		return -EEXIST;
@@ -883,24 +884,15 @@ static int br_mdb_add_group_src(const struct br_mdb_config *cfg,
 	if (err)
 		goto err_del_sg;
 
-	ent->flags = BR_SGRP_F_INSTALLED | BR_SGRP_F_USER_ADDED;
+	ent->flags = BR_SGRP_F_INSTALLED | BR_SGRP_F_USER_ADDED |
+		     (ent->flags & BR_SGRP_F_NEW);
 
 	return 0;
 
 err_del_sg:
-	__br_multicast_del_group_src(ent);
+	if (ent->flags & BR_SGRP_F_NEW)
+		__br_multicast_del_group_src(ent);
 	return err;
-}
-
-static void br_mdb_del_group_src(struct net_bridge_port_group *pg,
-				 struct br_mdb_src_entry *src)
-{
-	struct net_bridge_group_src *ent;
-
-	ent = br_multicast_find_group_src(pg, &src->addr);
-	if (WARN_ON_ONCE(!ent))
-		return;
-	br_multicast_del_group_src(ent, false);
 }
 
 static int br_mdb_add_group_srcs(const struct br_mdb_config *cfg,
@@ -908,6 +900,8 @@ static int br_mdb_add_group_srcs(const struct br_mdb_config *cfg,
 				 struct net_bridge_mcast *brmctx,
 				 struct netlink_ext_ack *extack)
 {
+	struct net_bridge_group_src *ent;
+	struct hlist_node *tmp;
 	int i, err;
 
 	for (i = 0; i < cfg->num_src_entries; i++) {
@@ -917,11 +911,16 @@ static int br_mdb_add_group_srcs(const struct br_mdb_config *cfg,
 			goto err_del_group_srcs;
 	}
 
+	hlist_for_each_entry(ent, &pg->src_list, node)
+		ent->flags &= ~BR_SGRP_F_NEW;
+
 	return 0;
 
 err_del_group_srcs:
-	for (i--; i >= 0; i--)
-		br_mdb_del_group_src(pg, &cfg->src_entries[i]);
+	hlist_for_each_entry_safe(ent, tmp, &pg->src_list, node) {
+		if (ent->flags & BR_SGRP_F_NEW)
+			br_multicast_del_group_src(ent, false);
+	}
 	return err;
 }
 

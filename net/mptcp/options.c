@@ -762,7 +762,8 @@ static bool mptcp_established_options_add_addr(struct sock *sk,
 	return true;
 }
 
-static bool mptcp_established_options_rm_addr(struct sock *sk, int *size,
+static bool mptcp_established_options_rm_addr(struct sock *sk,
+					      struct sk_buff *skb, int *size,
 					      unsigned int remaining,
 					      struct mptcp_out_options *opts)
 {
@@ -772,8 +773,12 @@ static bool mptcp_established_options_rm_addr(struct sock *sk, int *size,
 	int i;
 
 	if (!mptcp_pm_should_rm_signal(msk) ||
-	    !(mptcp_pm_rm_addr_signal(msk, remaining, &rm_list, size)))
+	    !(mptcp_pm_rm_addr_signal(msk, remaining, &rm_list, size, !skb)))
 		return false;
+
+	/* without skb, only the size is needed: keep it for the next packet */
+	if (!skb)
+		return true;
 
 	opts->suboptions |= OPTION_MPTCP_RM_ADDR;
 	opts->rm_list = rm_list;
@@ -886,9 +891,11 @@ int mptcp_established_options(struct sock *sk, struct sk_buff *skb,
 	opts->suboptions = 0;
 
 	/* Force later mptcp_write_options(), but do not use any actual
-	 * option space.
+	 * option space, except for an infinite mapping still to be sent.
 	 */
-	if (unlikely(__mptcp_check_fallback(msk) && !mptcp_check_infinite_map(skb)))
+	if (unlikely(__mptcp_check_fallback(msk) &&
+		     !mptcp_check_infinite_map(skb) &&
+		     (skb || !subflow->send_infinite_map)))
 		return 0;
 
 	if (unlikely(skb && TCP_SKB_CB(skb)->tcp_flags & TCPHDR_RST)) {
@@ -933,7 +940,8 @@ int mptcp_established_options(struct sock *sk, struct sk_buff *skb,
 		total_size += opt_size;
 		remaining -= opt_size;
 		ret = true;
-	} else if (mptcp_established_options_rm_addr(sk, &opt_size, remaining, opts)) {
+	} else if (mptcp_established_options_rm_addr(sk, skb, &opt_size,
+						     remaining, opts)) {
 		total_size += opt_size;
 		remaining -= opt_size;
 		ret = true;
@@ -1046,6 +1054,10 @@ static bool check_fully_established(struct mptcp_sock *msk, struct sock *ssk,
 		pr_warn_once("bogus mpc option on established client sk");
 
 set_fully_established:
+	/* the peer can no longer fall back to TCP */
+	if (subflow->request_join)
+		set_bit(MPTCP_JOINED, &msk->flags);
+
 	if (mp_opt->deny_join_id0)
 		WRITE_ONCE(msk->pm.remote_deny_join_id0, true);
 
@@ -1278,6 +1290,17 @@ bool mptcp_incoming_options(struct sock *sk, struct sk_buff *skb)
 	if (!check_fully_established(msk, sk, subflow, skb, &mp_opt))
 		return sk->sk_state != TCP_CLOSE;
 
+	/* MPTCP opts, not an infinite map: the peer did not fall back */
+	if (mp_opt.suboptions && !(mp_opt.use_map && !mp_opt.data_len)) {
+		u32 ack_seq = TCP_SKB_CB(skb)->ack_seq;
+
+		if (after(ack_seq, subflow->opt_ack_seq))
+			subflow->opt_ack_seq = ack_seq;
+		if (unlikely(subflow->old_data_pending) &&
+		    !before(ack_seq, subflow->old_data_end))
+			subflow->old_data_pending = 0;
+	}
+
 	if (unlikely(mp_opt.suboptions != OPTION_MPTCP_DSS)) {
 		if ((mp_opt.suboptions & OPTION_MPTCP_FASTCLOSE) &&
 		    READ_ONCE(msk->local_key) == mp_opt.fc_recv_key) {
@@ -1343,6 +1366,10 @@ bool mptcp_incoming_options(struct sock *sk, struct sk_buff *skb)
 
 		return true;
 	}
+
+	/* the push from ack_update_msk() can reset the subflow */
+	if (unlikely(sk->sk_state == TCP_CLOSE))
+		return false;
 
 	mpext = skb_ext_add(skb, SKB_EXT_MPTCP);
 	if (!mpext)
