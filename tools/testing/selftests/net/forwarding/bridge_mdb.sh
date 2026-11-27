@@ -293,6 +293,7 @@ __cfg_test_port_ip_star_g()
 	local grp=$1; shift
 	local invalid_grp=$1; shift
 	local src_prefix=$1; shift
+	local invalid_src=$1; shift
 	local src1=${src_prefix}1
 	local src2=${src_prefix}2
 	local src3=${src_prefix}3
@@ -487,6 +488,23 @@ __cfg_test_port_ip_star_g()
 
 	bridge mdb del dev br0 port $swp1 grp $grp vid 10
 
+	# Check that a failed replace does not change the source list.
+	bridge mdb add dev br0 port $swp1 grp $grp temp vid 10 \
+		filter_mode exclude source_list $src1,$src2
+
+	bridge mdb replace dev br0 port $swp1 grp $grp temp vid 10 \
+		filter_mode exclude source_list $src1,$src1,$src3,$invalid_src \
+		&> /dev/null
+	check_fail $? "Managed to replace source list with an invalid source"
+	bridge -d mdb get dev br0 grp $grp src $src1 vid 10 &> /dev/null
+	check_err $? "(S, G) entry for source $src1 deleted after failed replace"
+	bridge -d mdb get dev br0 grp $grp src $src2 vid 10 &> /dev/null
+	check_err $? "(S, G) entry for source $src2 deleted after failed replace"
+	bridge -d mdb get dev br0 grp $grp src $src3 vid 10 &> /dev/null
+	check_fail $? "(S, G) entry for source $src3 created after failed replace"
+
+	bridge mdb del dev br0 port $swp1 grp $grp vid 10
+
 	# Check that protocol can be modified.
 	bridge mdb add dev br0 port $swp1 grp $grp temp vid 10 \
 		filter_mode exclude source_list $src1 proto zebra
@@ -568,8 +586,9 @@ cfg_test_port_ip_star_g()
 
 	cfg_test_port_common "IPv4 (*, G)" "grp 239.1.1.1"
 	cfg_test_port_common "IPv6 (*, G)" "grp ff0e::1"
-	__cfg_test_port_ip_star_g "IPv4" "239.1.1.1" "224.0.0.1" "192.0.2."
-	__cfg_test_port_ip_star_g "IPv6" "ff0e::1" "ff02::1" "2001:db8:1::"
+	__cfg_test_port_ip_star_g "IPv4" "239.1.1.1" "224.0.0.1" "192.0.2." \
+		"0.0.0.0"
+	__cfg_test_port_ip_star_g "IPv6" "ff0e::1" "ff02::1" "2001:db8:1::" "::"
 }
 
 __cfg_test_port_ip_sg()
