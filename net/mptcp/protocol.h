@@ -602,7 +602,7 @@ struct mptcp_subflow_context {
 		is_mptfo : 1,	    /* subflow is doing TFO */
 		mpc_drop : 1,	    /* the MPC option has been dropped in a rtx */
 		resetting : 1,	    /* subflow is resetting */
-		old_data_pending : 1, /* old_data_end not acked with a DSS */
+		old_data_pending : 1, /* old data not acked with MPTCP opts */
 		__unused : 8;
 	bool	data_avail;
 	bool	scheduled;
