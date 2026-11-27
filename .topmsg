@@ -1,2 +1,30 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-clear-DEFER_CONNECT-on-disconnect
+Subject: [PATCH] mptcp: clear DEFER_CONNECT on disconnect
+
+With TCP_FASTOPEN_CONNECT, mptcp_connect() copies the DEFER_CONNECT bit
+of the first subflow to the msk. This bit is cleared on the first
+write(), but not when the msk is disconnected, e.g. with
+connect(AF_UNSPEC) before any write().
+
+tcp_disconnect() clears this bit on the subflow, but mptcp_disconnect()
+leaves it set on the msk. The next write() then goes through
+mptcp_sendmsg_fastopen(), and tries to connect the msk again with a NULL
+address: mptcp_connect() moves the msk back to SYN_SENT, possibly
+allocates a token and increments the MPCapableActive counter, before the
+subflow connect() fails. -EINVAL is then returned, instead of -EPIPE.
+The stale bit is also reported by the diag interface.
+
+Clear DEFER_CONNECT in mptcp_disconnect(), like tcp_disconnect() does.
+
+This issue has been found by an AI code review agent, while fixing a
+similar issue, and confirmed with a new Packetdrill test: a deferred
+connect, then connect(AF_UNSPEC), then send(). Without this patch,
+send() failed with EINVAL:
+
+  client-TCP_FASTOPEN_CONNECT-disconnect.pkt:35: runtime error in send call: Expected errno 32 (Broken pipe) but got 22 (Invalid argument)
+
+Fixes: a42cf9d18278 ("mptcp: poll allow write call before actual connect")
+Reviewed-by: Geliang Tang <geliang@kernel.org>
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+---
+v2: new, for an issue found by a review agent
