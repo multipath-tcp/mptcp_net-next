@@ -1,2 +1,63 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-send-the-infinite-map-in-a-single-segment
+Subject: [PATCH] mptcp: send the infinite map in a single segment
+
+After an MP_FAIL with a single subflow, mptcp_sendmsg_frag() puts the
+infinite mapping on the next skb with new data, then falls back to TCP.
+This skb can be bigger than one MSS: it is sized with the size goal
+computed before the fallback, from an MSS reserving the space for the
+DSS option.
+After the fallback, this space is no longer reserved when the MSS is
+computed, but this skb still carries a DSS option, which is copied to
+each of its segments: with the new MSS, they are bigger than the MTU.
+
+The new MSS is used for the next transmissions, e.g. when only a part of
+the skb can be sent at first, or for a retransmission, and it can also
+be used for the first one, when more data is pushed in the same batch.
+The IP layer drops such segments, as DF is set, and sends an ICMP
+"Fragmentation Needed" to the local host, which doesn't change the PMTU:
+the transfer stalls.
+
+This issue was causing the "Infinite map" subtest from mptcp_join.sh to
+be flaky, with the client counting these ICMPs as OutOfWindowIcmps, and
+its subflow stuck with unsent data:
+
+  copyfd_io_poll: poll timed out (events: POLLIN 1, POLLOUT 0)
+  (...)
+    TcpExtOutOfWindowIcmps          134
+  (...)
+  tcp FIN-WAIT-1 (...) timer:(persist,21sec,7) (...) notsent:98333 (...)
+  (...)
+        infi rx server       [FAIL] got 0 infinite map[s] RX expected 1
+
+The root cause has been confirmed with a Packetdrill script, a variant
+of the new dss_infinite_map_mss_server.pkt test from the MPTCP
+Packetdrill tests, with an MP_FAIL received before any data, and a cwnd
+of 1: without this fix, the rest of the infinite mapping, after the
+first MSS, was never sent:
+
+  IpFragFails                     2                  0.0
+  (...) timer:(persist,305ms,1) (...) cwnd:2 (...) notsent:1564 (...)
+  infinite_map_stall-v4.pkt:27: error handling packet: Timed out waiting for packet
+
+To fix this issue, limit the skb carrying the infinite mapping to one
+MSS, as computed before the fallback. The segments of this skb can still
+be too big if the MSS decreases before it is acked, e.g. after a PMTU
+drop, but this is unlikely right after an MP_FAIL, and this connection
+would then stall as with a PMTU black hole.
+
+A side effect: when the last unsent skb is bigger than one MSS, the
+infinite mapping is now put on a new skb. This unsent skb is then sent
+without DSS after the fallback, as it was already the case for the ones
+before it, and the peer falls back before receiving the infinite
+mapping.
+
+Fixes: 1e39e5a32ad7 ("mptcp: infinite mapping sending")
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+---
+v2: new, for an issue causing a flaky selftest
+v3: commit msg: why an MSS decrease before the infinite mapping is
+    acked is not handled (Clashiko)
+
+Note (Clashiko on v3): the "Infinite map" subtest passed 40 times in a
+row: with the pause in its transfer, nothing is left unsent before the
+infinite mapping.
