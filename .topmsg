@@ -1,2 +1,29 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-set-SEND_SHUTDOWN-on-close-by-an-sf-error
+Subject: [PATCH] mptcp: set SEND_SHUTDOWN on close by an sf error
+
+After a fallback to TCP, or during the MPC connection, an error on a
+subflow is propagated to the MPTCP socket, which moves to TCP_CLOSE.
+But sk_shutdown was not updated, while tcp_done() does it. A thread
+blocked in send() was then only woken up by the socket error: if
+another thread consumed it first, the sender went back to sleep, for
+good.
+
+Set SEND_SHUTDOWN here too, after the error, as tcp_done_with_error()
+does, not to have poll() reporting a close without error in between.
+Setting RCV_SHUTDOWN, as tcp_done() does, would change what recv()
+returns once the error has been consumed: this is left for net-next.
+
+This issue has been found by an AI code review agent, while fixing a
+similar issue, and confirmed with a reproducer: after a fallback to TCP,
+a thread reads and another one writes on the same socket, until the peer
+resets the connection. A part of the writers were then still blocked in
+send(), and none with TCP or with this patch.
+
+Fixes: 15cc10453398 ("mptcp: deliver ssk errors to msk")
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+---
+v2: new, for a similar issue found by a review agent
+
+Note (Clashiko on v2): the comment in mptcp_poll() names
+__mptcp_error_report(), not __mptcp_subflow_error_report():
+pre-existing, can be fixed in net-next.
