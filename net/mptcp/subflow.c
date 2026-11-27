@@ -151,6 +151,9 @@ static void subflow_init_req(struct request_sock *req, const struct sock *sk_lis
 	subflow_req->allow_join_id0 = mptcp_allow_join_id0(sock_net(sk_listener));
 	subflow_req->msk = NULL;
 	mptcp_token_init_request(req);
+
+	/* read by tcp_check_req() even after migration to a TCP listener */
+	tcp_rsk(req)->drop_req = false;
 }
 
 static bool subflow_use_different_sport(struct mptcp_sock *msk, const struct sock *sk)
@@ -832,7 +835,7 @@ void mptcp_subflow_drop_ctx(struct sock *ssk)
 			sock_put(ctx->conn);
 	}
 
-	kfree_rcu(ctx, rcu);
+	mptcp_subflow_free_ctx(ctx);
 }
 
 void __mptcp_subflow_fully_established(struct mptcp_sock *msk,
@@ -842,6 +845,22 @@ void __mptcp_subflow_fully_established(struct mptcp_sock *msk,
 	subflow_set_remote_key(msk, subflow, mp_opt);
 	WRITE_ONCE(subflow->fully_established, true);
 	WRITE_ONCE(msk->fully_established, true);
+}
+
+/* Children of a kernel listener need a netns ref for their timers */
+static bool subflow_child_get_net(struct sock *child)
+{
+	struct net *net = sock_net(child);
+
+	if (likely(child->sk_net_refcnt))
+		return true;
+
+	if (!maybe_get_net(net))
+		return false;
+
+	__sk_net_refcnt_upgrade(child, GFP_ATOMIC);
+	put_net(net);
+	return true;
 }
 
 static struct sock *subflow_syn_recv_sock(const struct sock *sk,
@@ -911,6 +930,11 @@ create_child:
 		struct mptcp_subflow_context *ctx = mptcp_subflow_ctx(child);
 
 		tcp_rsk(req)->drop_req = false;
+
+		if (!subflow_child_get_net(child)) {
+			subflow_add_reset_reason(skb, MPTCP_RST_EUNSPEC);
+			goto dispose_child;
+		}
 
 		/* we need to fallback on ctx allocation failure and on pre-reqs
 		 * checking above. In the latter scenario we additionally need
@@ -1860,8 +1884,10 @@ int mptcp_subflow_create_socket(struct sock *sk, unsigned short family,
 	/* kernel sockets do not by default acquire net ref, but TCP timer
 	 * needs it.
 	 * Update ns_tracker to current stack trace and refcounted tracker.
+	 * Not for a kernel msk, e.g. a PM listener: it would pin the netns.
 	 */
-	sk_net_refcnt_upgrade(sf->sk);
+	if (sk->sk_net_refcnt)
+		sk_net_refcnt_upgrade(sf->sk);
 	err = tcp_set_ulp(sf->sk, "mptcp");
 	if (err)
 		goto err_free;
@@ -2098,7 +2124,7 @@ static void subflow_ulp_release(struct sock *ssk)
 
 	mptcp_subflow_ops_undo_override(ssk);
 	if (release)
-		kfree_rcu(ctx, rcu);
+		mptcp_subflow_free_ctx(ctx);
 }
 
 static void subflow_ulp_clone(const struct request_sock *req,

@@ -1372,8 +1372,8 @@ int inet_csk_listen_start(struct sock *sk)
 
 	/* There is race window here: we announce ourselves listening,
 	 * but this transition is still not validated by get_port().
-	 * It is OK, because this socket enters to hash table only
-	 * after validation is complete.
+	 * This socket enters to hash table only after validation is
+	 * complete, but reqs of an earlier listen() may queue children.
 	 */
 	inet_sk_state_store(sk, TCP_LISTEN);
 	err = sk->sk_prot->get_port(sk, inet->inet_num);
@@ -1391,9 +1391,13 @@ int inet_csk_listen_start(struct sock *sk)
 
 	/* A Fast Open child accepted before a previous shutdown() of this
 	 * listener might have queued its request in rskq_rst_head while
-	 * we were transiently in TCP_LISTEN state.
+	 * we were transiently in TCP_LISTEN state. The accept queue of an
+	 * MPTCP subflow is drained by mptcp_listen().
 	 */
-	reqsk_fastopen_purge_rst(&icsk->icsk_accept_queue);
+	if (sk_is_mptcp(sk))
+		reqsk_fastopen_purge_rst(&icsk->icsk_accept_queue);
+	else
+		inet_csk_listen_stop(sk);
 	return err;
 }
 
