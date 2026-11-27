@@ -1438,8 +1438,15 @@ static int mptcp_sendmsg_frag(struct sock *sk, struct sock *ssk,
 	/* Once the infinite mapping is sent, the MSS no longer includes its DSS
 	 * option: send it in a single segment.
 	 */
-	if (unlikely(mptcp_subflow_ctx(ssk)->send_infinite_map))
+	if (unlikely(mptcp_subflow_ctx(ssk)->send_infinite_map &&
+		     !mptcp_subflow_ctx(ssk)->old_data_pending))
 		copy = info->mss_now;
+
+	/* after a fallback, the subflow got all data below snd_nxt already */
+	if (unlikely(__mptcp_check_fallback(msk) &&
+		     before64(data_seq, msk->snd_nxt)))
+		return min_t(u64, msk->snd_nxt - data_seq,
+			     info->limit - info->sent);
 
 	skb = tcp_write_queue_tail(ssk);
 	if (skb && copy > skb->len) {
@@ -1521,6 +1528,12 @@ alloc_skb:
 	TCP_SKB_CB(skb)->end_seq += copy;
 	tcp_skb_pcount_set(skb, 0);
 
+	/* old data mapped again: no fallback until acked with a DSS */
+	if (unlikely(before64(data_seq, msk->snd_nxt))) {
+		mptcp_subflow_ctx(ssk)->old_data_end = tcp_sk(ssk)->write_seq;
+		mptcp_subflow_ctx(ssk)->old_data_pending = 1;
+	}
+
 	/* on skb reuse we just need to update the DSS len */
 	if (reuse_skb) {
 		TCP_SKB_CB(skb)->tcp_flags &= ~TCPHDR_PSH;
@@ -1551,7 +1564,10 @@ alloc_skb:
 out:
 	if (READ_ONCE(msk->csum_enabled))
 		mptcp_update_data_checksum(skb, copy);
-	if (mptcp_subflow_ctx(ssk)->send_infinite_map)
+
+	/* the infinite map implies a fallback: wait for old data acks */
+	if (mptcp_subflow_ctx(ssk)->send_infinite_map &&
+	    !mptcp_subflow_ctx(ssk)->old_data_pending)
 		mptcp_update_infinite_map(msk, ssk, mpext);
 	trace_mptcp_sendmsg_frag(mpext);
 	mptcp_subflow_ctx(ssk)->rel_write_seq += copy;
