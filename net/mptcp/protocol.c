@@ -2776,6 +2776,14 @@ out:
 		} else {
 			mptcp_start_tout_timer(sk);
 		}
+	} else if (list_is_singular(&msk->conn_list) && msk->first &&
+		   mptcp_subflow_ctx(msk->first)->closing &&
+		   !inet_csk(sk)->icsk_mtup.probe_timestamp &&
+		   sk->sk_state != TCP_CLOSE) {
+		/* The initial subflow has only been shut down, and its later
+		 * close will be ignored: start the close timeout now.
+		 */
+		mptcp_start_tout_timer(sk);
 	}
 }
 
