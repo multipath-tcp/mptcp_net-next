@@ -1,2 +1,36 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-count-a-listener-once-when-listen-is-called-again
+Subject: [PATCH] mptcp: count a listener once when listen() is called again
+
+listen() on a listening MPTCP socket only updates its backlog, as with
+TCP. But mptcp_listen() then counts this socket once more in the
+"sockets" column of the MPTCP or MPTCPv6 row of /proc/net/protocols, and
+sends a new MPTCP_EVENT_LISTENER_CREATED event, while only one decrement
+and one MPTCP_EVENT_LISTENER_CLOSED event are done when it is closed.
+Each extra listen() call then leaves the counter one above the number of
+MPTCP sockets in use, for the lifetime of the netns, and a userspace
+path manager can see two listeners created for one closed.
+
+With TCP, the socket is only counted when it is hashed, which is not
+done again for a listening socket.
+
+The fix used here is to only count the socket, and send the event, if it
+was not already listening.
+
+This issue has been found by an AI code review agent, while reviewing
+the code of the commit "mptcp: pm: kernel: count endpoint listeners as
+sockets in use", and confirmed with a new Packetdrill test, and with a
+script calling listen() twice. Without this patch:
+
+  listen_listen.pkt:12: error executing `test $(awk '/^MPTCP/ { n += $3 } END { print n }' /proc/net/protocols) -eq 1` command: non-zero status 1
+
+  inuse: relisten: listening: 2 (expected 1)
+  inuse: relisten: closed: 1 (expected 0)
+
+The extra event comes from the commit below, and the extra count from
+commit c558246ee73e ("mptcp: add statistics for mptcp socket in use"),
+which is in all the stable versions having the commit below.
+
+Fixes: f8c9dfbd875b ("mptcp: add pm listener events")
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+---
+v2: commit message: explain the two Fixes tags
