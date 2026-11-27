@@ -1,2 +1,51 @@
-From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-don-t-charge-the-backlog-twice-at-accept
+From: Chris Mason <mason@kernel.org>
+Subject: [PATCH] mptcp: don't charge the backlog twice at accept()
+
+accept() can permanently overcharge the memory cgroup of an MPTCP
+server, so the server can be OOM killed, if the new connection received
+data while its MPTCP socket was locked.
+
+The sockets of an MPTCP connection have no memory cgroup before
+accept(), which then charges the sk_forward_alloc and the sk_rmem_alloc
+of the MPTCP socket (msk) and of each subflow. mptcp_graft_subflows()
+also charges msk->backlog_unaccounted: the truesize of the skbs that
+__mptcp_add_backlog() queued while the socket lock of the msk was held
+and their subflow had no memory cgroup. But the first charge already
+covers each of these skbs that has not been freed, in the sk_rmem_alloc
+of its subflow or of the msk, so no later uncharge matches the extra
+charge.
+
+The fix used here is to remove msk->backlog_unaccounted, its charge in
+mptcp_graft_subflows() and the warning that tests it in
+mptcp_can_spool_backlog(). An RFC patch [1] removes the same lines, as
+part of another approach.
+
+This issue has been found with the help of an LLM, and reproduced in a
+VM, with the reproducer shared with the original version of this patch,
+on a kernel with the previous patch: 100,000 connections to an MPTCP
+server in a memory cgroup. Without this patch, about 63 MB stayed
+charged to this memory cgroup once all the connections were closed, and
+to its parent after its removal:
+
+  SNAP label=after-100000 rounds=100000 sockets_left_in_srv=0 tcp_mem_pages=0 [...] c_sock=63295488 [...]
+  [...]
+  SNAP label=c-removed rounds=100000 sockets_left_in_srv=0 tcp_mem_pages=0 c=removed [...] p_sock=63295488 [...]
+
+And about 12 MB with only 50 connections, each getting 20,000 one-byte
+segments before accept(), new for TCP but with the same data sequence
+number, so the msk drops them as duplicates. Bare ACKs with RM_ADDR,
+sent at the same time, make the MPTCP worker take the socket lock, so
+that some of these segments go through the backlog:
+
+  SNAP label=after-50 rounds=50 sockets_left_in_srv=0 tcp_mem_pages=256 [...] c_sock=12881920 [...]
+
+Fixes: 6228efe0cc01 ("mptcp: leverage the backlog for RX packet processing")
+Link: https://lore.kernel.org/all/20260924080219.1036588-4-caixinchen1@huawei.com/ [1]
+Signed-off-by: Chris Mason <mason@kernel.org>
+[ No comment change: the commit message explains why the backlog is
+  covered. Commit message: refer to the RFC [1] removing the same lines
+  + how the issue was found, and its symptoms. ]
+Reviewed-by: Mat Martineau <martineau@kernel.org>
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+---
+v4: commit msg: clarify the duplicates (Mat)
