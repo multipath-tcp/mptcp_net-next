@@ -1051,7 +1051,8 @@ static bool check_fully_established(struct mptcp_sock *msk, struct sock *ssk,
 	}
 
 	if (unlikely(!READ_ONCE(msk->pm.server_side)))
-		pr_warn_once("bogus mpc option on established client sk");
+		/* DO-NOT-MERGE: use WARN i/o pr_warn: only for MPTCP export */
+		WARN_ONCE(1, "bogus mpc option on established client sk");
 
 set_fully_established:
 	/* the peer can no longer fall back to TCP */
