@@ -1,2 +1,37 @@
 From: Matthieu Baerts (NGI0) <matttbe@kernel.org>
-Subject: [PATCH] t/mptcp-limit-an-orphan-probing-a-zero-window
+Subject: [PATCH] mptcp: limit an orphan probing a zero window
+
+Since the previous commit, an orphan with data to send is kept while
+the peer acks something, at least the window probes: a peer keeping its
+window closed, e.g. not reading, could then keep the orphan forever.
+
+TCP limits this for its orphans: tcp_probe_timer() aborts them instead
+of probing again after the max interval. The subflows of an MPTCP orphan
+are not orphaned: they probe again then, and back off once more, up to
+tcp_retries2. So check if TCP would have aborted them, when the close
+timeout expires. Same with data in flight, when the peer has shrunk its
+window to zero: tcp_retransmit_timer() only aborts orphans then.
+
+Two corner cases needing non-default settings are not covered, which is
+fine: an idle subflow refreshed by keepalives still keeps the orphan
+when the stale detection is disabled, and tcp_orphan_retries is ignored.
+
+This was found by an AI code review agent, while reviewing the previous
+commit. With its reproducer and a long pause, the orphan was kept until
+the end of the pause. It is now reset as TCP does, respecting
+tcp_retries2.
+
+Note for the backports: this patch is needed with the previous one, and
+before v6.15, tcp_rto_max() can be replaced by TCP_RTO_MAX.
+
+Fixes: e16163b6e2b7 ("mptcp: refactor shutdown and close")
+Reviewed-by: Mat Martineau <martineau@kernel.org>
+Signed-off-by: Matthieu Baerts (NGI0) <matttbe@kernel.org>
+---
+v2: new, to limit the orphans kept by the previous patch, with the same
+    Fixes tag to backport them together.
+
+Note (Clashiko on v2): a peer acking the data at the TCP level only
+keeps the orphan, but this is bounded by tcp_max_orphans and tcp_mem
+since the next patch. With the stale detection, the probing subflow is
+marked as stale, and its data is moved to the idle one.
