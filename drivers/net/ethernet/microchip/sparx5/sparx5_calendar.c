@@ -595,10 +595,13 @@ static int sparx5_config_dsm_calendar(struct sparx5 *sparx5)
 			dev_err(sparx5->dev, "DSM calendar calculation failed\n");
 			goto cal_out;
 		}
-		err = sparx5_dsm_calendar_check(sparx5, data);
-		if (err) {
-			dev_err(sparx5->dev, "DSM calendar check failed\n");
-			goto cal_out;
+		if (is_sparx5(sparx5)) {
+			err = sparx5_dsm_calendar_check(sparx5, data);
+			if (err) {
+				dev_err(sparx5->dev,
+					"DSM calendar check failed\n");
+				goto cal_out;
+			}
 		}
 		err = sparx5_dsm_calendar_update(sparx5, taxi, data);
 		if (err) {
