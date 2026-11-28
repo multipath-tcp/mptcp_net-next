@@ -2492,7 +2492,7 @@ static unsigned int mptcp_inq_hint(const struct sock *sk)
 		return (unsigned int)hint_val;
 	}
 
-	if (sk->sk_state == TCP_CLOSE || (sk->sk_shutdown & RCV_SHUTDOWN))
+	if (sock_flag(sk, SOCK_DONE))
 		return 1;
 
 	return 0;
